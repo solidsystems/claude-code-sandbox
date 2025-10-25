@@ -556,10 +556,16 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
         const fileListPath = `/tmp/claude-sandbox-files-${Date.now()}.txt`;
         fs.writeFileSync(fileListPath, untrackedFiles.join("\n"));
 
+        // Set COPYFILE_DISABLE=1 on macOS to prevent extended attributes in tar
+        const tarEnv = process.platform === "darwin"
+          ? { ...process.env, COPYFILE_DISABLE: "1" }
+          : process.env;
+
         // Append untracked files to the tar
         execSync(`tar -rf "${tarFile}" --files-from="${fileListPath}"`, {
           cwd: workDir,
           stdio: "pipe",
+          env: tarEnv,
         });
 
         fs.unlinkSync(fileListPath);
@@ -596,11 +602,18 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
       // On macOS, also exclude extended attributes that cause Docker issues
       const additionalFlags = (process.platform as string) === "darwin" ? "--no-xattrs --no-fflags" : "";
       const combinedFlags = `${tarFlags} ${additionalFlags}`.trim();
+
+      // Set COPYFILE_DISABLE=1 on macOS to prevent extended attributes in tar
+      const tarEnv = process.platform === "darwin"
+        ? { ...process.env, COPYFILE_DISABLE: "1" }
+        : process.env;
+
       execSync(
         `tar -cf "${gitTarFile}" --exclude="._*" --exclude=".DS_Store" ${combinedFlags} .git`,
         {
           cwd: workDir,
           stdio: "pipe",
+          env: tarEnv,
         },
       );
 
@@ -788,9 +801,8 @@ exec claude --dangerously-skip-permissions' > /start-claude.sh && \\
 
         const tarFile = `/tmp/claude-dir-${Date.now()}.tar`;
         const tarFlags = getTarFlags();
-        // On macOS, also exclude extended attributes that cause Docker issues
-        const additionalFlags = (process.platform as string) === "darwin" ? "--no-xattrs --no-fflags" : "";
-        const combinedFlags = `${tarFlags} ${additionalFlags}`.trim();
+        const combinedFlags = tarFlags;
+
         execSync(
           `tar -cf "${tarFile}" ${combinedFlags} -C "${os.homedir()}" .claude`,
           {
